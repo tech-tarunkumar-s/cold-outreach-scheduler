@@ -9,6 +9,7 @@ export interface SendMailResult {
 
 class SmtpService {
   private transporter: nodemailer.Transporter | null = null;
+  private authEmail: string = 'outreach@ethereal.email';
 
   private async getTransporter(): Promise<nodemailer.Transporter> {
     if (this.transporter) {
@@ -19,6 +20,7 @@ class SmtpService {
     const pass = process.env.ETHEREAL_PASS;
 
     if (user && pass) {
+      this.authEmail = user;
       this.transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
         port: 587,
@@ -27,10 +29,15 @@ class SmtpService {
           user,
           pass,
         },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 15000,
       });
+      console.log(`[SmtpService] Initialized Ethereal with static credentials: ${user}`);
     } else {
-      console.log('[SmtpService] Generating new Ethereal test account...');
+      console.log('[SmtpService] Generating Ethereal test account...');
       const testAccount = await nodemailer.createTestAccount();
+      this.authEmail = testAccount.user;
       console.log(`[SmtpService] Created Ethereal Account: ${testAccount.user}`);
       this.transporter = nodemailer.createTransport({
         host: 'smtp.ethereal.email',
@@ -40,6 +47,9 @@ class SmtpService {
           user: testAccount.user,
           pass: testAccount.pass,
         },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+        socketTimeout: 15000,
       });
     }
 
@@ -55,7 +65,8 @@ class SmtpService {
     try {
       const transporter = await this.getTransporter();
       const info = await transporter.sendMail({
-        from: `"${senderEmail}" <${senderEmail}>`,
+        from: `"ReachInbox Outreach" <${this.authEmail}>`,
+        replyTo: senderEmail,
         to,
         subject,
         text: body,
