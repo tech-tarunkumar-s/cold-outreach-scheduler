@@ -48,27 +48,27 @@ export class EmailController {
           ? Number(delayBetweenSeconds)
           : parseInt(process.env.MIN_DELAY_SECONDS || '2', 10);
 
-      const createdJobs = await prisma.$transaction(
-        recipients.map((recipient: string, index: number) => {
-          const itemScheduledTime = new Date(
-            scheduleDate.getTime() + index * throttleDelaySec * 1000
-          );
+      const baseDelay = Math.max(0, scheduleDate.getTime() - Date.now());
+      const throttleMs = throttleDelaySec * 1000;
 
-          return prisma.emailJob.create({
-            data: {
-              userId: userId || null,
-              senderEmail,
-              recipientEmail: recipient.trim(),
-              subject,
-              body,
-              scheduledAt: itemScheduledTime,
-              status: 'SCHEDULED',
-            },
-          });
-        })
-      );
+      const createdJobs = [];
 
-      for (const jobRecord of createdJobs) {
+      for (let i = 0; i < recipients.length; i++) {
+        const individualDelay = baseDelay + i * throttleMs;
+        const targetTime = new Date(Date.now() + individualDelay);
+
+        const jobRecord = await prisma.emailJob.create({
+          data: {
+            userId: userId || null,
+            senderEmail,
+            recipientEmail: recipients[i].trim(),
+            subject,
+            body,
+            scheduledAt: targetTime,
+            status: 'SCHEDULED',
+          },
+        });
+
         await addEmailJob({
           emailJobId: jobRecord.id,
           senderEmail: jobRecord.senderEmail,
@@ -79,6 +79,8 @@ export class EmailController {
           hourlyLimit: hourlyLimit ? Number(hourlyLimit) : undefined,
           minDelaySeconds: throttleDelaySec,
         });
+
+        createdJobs.push(jobRecord);
       }
 
       res.status(201).json({
@@ -106,8 +108,8 @@ export class EmailController {
 
       res.json(scheduledEmails || []);
     } catch (error: any) {
-      console.error('[EmailController] Error fetching scheduled emails (DB might need migration):', error);
-      res.status(500).json({ error: error.message || 'Failed to query database. Ensure migrations are applied.' });
+      console.error('[EmailController] Error fetching scheduled emails:', error);
+      res.status(500).json({ error: error.message || 'Failed to query database.' });
     }
   }
 
