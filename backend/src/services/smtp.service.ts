@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import crypto from 'crypto';
 
 export interface SendMailResult {
   success: boolean;
@@ -19,49 +18,40 @@ export class SmtpService {
         secure: false,
         auth: {
           user: process.env.ETHEREAL_USER || 'queen.parisian32@ethereal.email',
-          pass: process.env.ETHEREAL_PASS || 'TspP9Bq4J53gA65u3G',
+          pass: process.env.ETHEREAL_PASS || 'HHGyb6dDbXGQS5H4m9',
         },
-        connectionTimeout: 4000, // 4s fast timeout if cloud firewall drops port
-        greetingTimeout: 4000,
-        socketTimeout: 4000,
+        tls: {
+          rejectUnauthorized: false,
+        },
       });
     }
     return this.transporter;
   }
 
   async sendMail(to: string, subject: string, body: string, senderEmail?: string) {
+    const transporter = this.getTransporter();
     const authUser = process.env.ETHEREAL_USER || 'queen.parisian32@ethereal.email';
-    
-    try {
-      console.log(`[SmtpService] Attempting Ethereal SMTP delivery to ${to}...`);
-      const transporter = this.getTransporter();
-      
-      const info = await transporter.sendMail({
-        from: `"ReachInbox" <${authUser}>`,
-        replyTo: senderEmail || 'demo@reachinbox.ai',
-        to,
-        subject,
-        html: body,
-      });
 
-      const previewUrl = nodemailer.getTestMessageUrl(info) || `https://ethereal.email/message/${crypto.randomBytes(16).toString('hex')}`;
-      console.log(`[SmtpService] ✓ Delivered to ${to}! MessageId: ${info.messageId}`);
-      return { success: true, messageId: info.messageId, previewUrl };
+    console.log(`[SmtpService] Sending REAL Ethereal email to ${to} from ${senderEmail}...`);
 
-    } catch (err: any) {
-      // If Render/Cloud firewall blocks raw SMTP ports, handle gracefully in sandbox mode
-      console.warn(`[SmtpService] Cloud firewall blocked raw SMTP socket (${err.code || err.message}). Using Ethereal sandbox simulation.`);
-      
-      const simulatedMessageId = `<${crypto.randomUUID()}@ethereal.email>`;
-      const simulatedPreviewUrl = `https://ethereal.email/messages`;
+    const info = await transporter.sendMail({
+      from: `"ReachInbox" <${authUser}>`,
+      replyTo: senderEmail || 'demo@reachinbox.ai',
+      to,
+      subject,
+      html: body,
+      text: body,
+    });
 
-      console.log(`[SmtpService] ✓ Sandbox Delivered to ${to}! MessageId: ${simulatedMessageId}`);
-      return { 
-        success: true, 
-        messageId: simulatedMessageId, 
-        previewUrl: simulatedPreviewUrl 
-      };
-    }
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    console.log(`[SmtpService] ✓ Real Ethereal Message ID: ${info.messageId}`);
+    console.log(`[SmtpService] ✓ Real Public Preview URL: ${previewUrl}`);
+
+    return {
+      success: true,
+      messageId: info.messageId,
+      previewUrl: previewUrl || undefined,
+    };
   }
 }
 
