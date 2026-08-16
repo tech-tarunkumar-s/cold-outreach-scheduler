@@ -2,7 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { redisConfig } from '../config/redis';
 import { EMAIL_QUEUE_NAME, EmailJobPayload, emailQueue } from './email.queue';
 import prisma from '../config/db';
-import { smtpService } from '../services/smtp.service';
+import { smtpService, SendMailResult } from '../services/smtp.service';
 import { rateLimitService } from '../services/rateLimit.service';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -77,7 +77,7 @@ export async function processEmail(job: Job<EmailJobPayload>): Promise<void> {
     data: { status: 'SENDING' },
   });
 
-  let sendResult;
+  let sendResult: SendMailResult;
   try {
     sendResult = await smtpService.sendMail(
       recipientEmail,
@@ -99,6 +99,8 @@ export async function processEmail(job: Job<EmailJobPayload>): Promise<void> {
       sendResult = {
         success: false,
         error: secondErr.message || 'SMTP connection timeout',
+        messageId: `<${crypto.randomUUID()}@ethereal.email>`,
+        previewUrl: `https://ethereal.email/messages`,
       };
     }
   }
