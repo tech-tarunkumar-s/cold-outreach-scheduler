@@ -294,7 +294,7 @@ function MainApp() {
             <Zap className="w-4 h-4" />
           </div>
           <div className="flex items-center space-x-2">
-            <span className="font-semibold text-sm tracking-tight text-zinc-100">ReachInbox</span>
+            <span className="font-semibold text-sm tracking-tight  text-yellow-400">ReachInbox</span>
             <span className="text-[11px] font-medium text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700/60">
               Scheduler
             </span>
