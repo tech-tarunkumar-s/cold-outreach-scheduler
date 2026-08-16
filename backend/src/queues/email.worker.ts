@@ -77,14 +77,33 @@ export async function processEmail(job: Job<EmailJobPayload>): Promise<void> {
     data: { status: 'SENDING' },
   });
 
-  const sendResult = await smtpService.sendMail(
-    recipientEmail,
-    subject,
-    body,
-    senderEmail
-  );
+  let sendResult;
+  try {
+    sendResult = await smtpService.sendMail(
+      recipientEmail,
+      subject,
+      body,
+      senderEmail
+    );
+  } catch (firstErr: any) {
+    console.log('[Worker] Retrying email delivery once due to socket reset / timeout...');
+    await sleep(1500);
+    try {
+      sendResult = await smtpService.sendMail(
+        recipientEmail,
+        subject,
+        body,
+        senderEmail
+      );
+    } catch (secondErr: any) {
+      sendResult = {
+        success: false,
+        error: secondErr.message || 'SMTP connection timeout',
+      };
+    }
+  }
 
-  if (sendResult.success) {
+  if (sendResult && sendResult.success) {
     await prisma.emailJob.update({
       where: { id: emailJobId },
       data: {
@@ -99,10 +118,10 @@ export async function processEmail(job: Job<EmailJobPayload>): Promise<void> {
       where: { id: emailJobId },
       data: {
         status: 'FAILED',
-        errorMessage: sendResult.error || 'Unknown send error',
+        errorMessage: sendResult?.error || 'Unknown send error',
       },
     });
-    console.error(`[Worker] Failed sending email ID ${emailJobId}: ${sendResult.error}`);
+    console.error(`[Worker] Failed sending email ID ${emailJobId}: ${sendResult?.error}`);
   }
 
   const throttleSeconds =

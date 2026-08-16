@@ -12,8 +12,8 @@ class SmtpService {
   private getTransporter() {
     const options: SMTPTransport.Options = {
       host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
+      port: 465,
+      secure: true,
       auth: {
         user: process.env.ETHEREAL_USER || 'queen.parisian32@ethereal.email',
         pass: process.env.ETHEREAL_PASS || 'HHGyb6dDbXGQS5H4m9',
@@ -34,10 +34,12 @@ class SmtpService {
     body: string,
     senderEmail?: string
   ): Promise<SendMailResult> {
-    try {
-      const transporter = this.getTransporter();
-      const authUser = process.env.ETHEREAL_USER || 'queen.parisian32@ethereal.email';
+    const authUser = process.env.ETHEREAL_USER || 'queen.parisian32@ethereal.email';
+    const transporter = this.getTransporter();
 
+    console.log(`[SmtpService] Opening fresh connection to deliver to ${to}...`);
+
+    try {
       const info = await transporter.sendMail({
         from: `"ReachInbox Outreach" <${authUser}>`,
         replyTo: senderEmail || 'demo@reachinbox.ai',
@@ -48,9 +50,9 @@ class SmtpService {
       });
 
       const previewUrl = nodemailer.getTestMessageUrl(info);
-      console.log(`[SmtpService] Email sent to ${to}. MessageId: ${info.messageId}`);
+      console.log(`[SmtpService] ✓ Delivered to ${to}! MessageId: ${info.messageId}`);
       if (previewUrl) {
-        console.log(`[SmtpService] Preview URL: ${previewUrl}`);
+        console.log(`[SmtpService] ✓ Preview URL: ${previewUrl}`);
       }
 
       return {
@@ -59,11 +61,8 @@ class SmtpService {
         previewUrl,
       };
     } catch (error: any) {
-      console.error('[SmtpService] Error sending email:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to send email',
-      };
+      console.error(`[SmtpService Error] Failed to send to ${to}:`, error.message);
+      throw error;
     }
   }
 }
