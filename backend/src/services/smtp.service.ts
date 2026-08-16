@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 export interface SendMailResult {
   success: boolean;
@@ -8,65 +9,38 @@ export interface SendMailResult {
 }
 
 class SmtpService {
-  private transporter: nodemailer.Transporter | null = null;
-  private authEmail: string = 'outreach@ethereal.email';
-
-  private async getTransporter(): Promise<nodemailer.Transporter> {
-    if (this.transporter) {
-      return this.transporter;
-    }
-
-    const user = process.env.ETHEREAL_USER;
-    const pass = process.env.ETHEREAL_PASS;
-
-    if (user && pass) {
-      this.authEmail = user;
-      this.transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: {
-          user,
-          pass,
-        },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 15000,
-      });
-      console.log(`[SmtpService] Initialized Ethereal with static credentials: ${user}`);
-    } else {
-      console.log('[SmtpService] Generating Ethereal test account...');
-      const testAccount = await nodemailer.createTestAccount();
-      this.authEmail = testAccount.user;
-      console.log(`[SmtpService] Created Ethereal Account: ${testAccount.user}`);
-      this.transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: {
-          user: testAccount.user,
-          pass: testAccount.pass,
-        },
-        connectionTimeout: 15000,
-        greetingTimeout: 15000,
-        socketTimeout: 15000,
-      });
-    }
-
-    return this.transporter;
+  private getTransporter() {
+    const options: SMTPTransport.Options = {
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.ETHEREAL_USER || 'queen.parisian32@ethereal.email',
+        pass: process.env.ETHEREAL_PASS || 'HHGyb6dDbXGQS5H4m9',
+      },
+      connectionTimeout: 20000,
+      greetingTimeout: 20000,
+      socketTimeout: 20000,
+      tls: {
+        rejectUnauthorized: false,
+      },
+    };
+    return nodemailer.createTransport(options);
   }
 
   async sendMail(
     to: string,
     subject: string,
     body: string,
-    senderEmail: string
+    senderEmail?: string
   ): Promise<SendMailResult> {
     try {
-      const transporter = await this.getTransporter();
+      const transporter = this.getTransporter();
+      const authUser = process.env.ETHEREAL_USER || 'queen.parisian32@ethereal.email';
+
       const info = await transporter.sendMail({
-        from: `"ReachInbox Outreach" <${this.authEmail}>`,
-        replyTo: senderEmail,
+        from: `"ReachInbox Outreach" <${authUser}>`,
+        replyTo: senderEmail || 'demo@reachinbox.ai',
         to,
         subject,
         text: body,
