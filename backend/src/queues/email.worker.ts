@@ -2,7 +2,7 @@ import { Worker, Job } from 'bullmq';
 import { redisConfig } from '../config/redis';
 import { EMAIL_QUEUE_NAME, EmailJobPayload, emailQueue } from './email.queue';
 import prisma from '../config/db';
-import { smtpService, SendMailResult } from '../services/smtp.service';
+import { smtpService } from '../services/smtp.service';
 import { rateLimitService } from '../services/rateLimit.service';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -11,6 +11,7 @@ export async function processEmail(job: Job<EmailJobPayload>): Promise<void> {
   const {
     emailJobId,
     senderEmail,
+  
     recipientEmail,
     subject,
     body,
@@ -29,7 +30,7 @@ export async function processEmail(job: Job<EmailJobPayload>): Promise<void> {
     return;
   }
 
-  if (emailRecord.status === 'SENT' || emailRecord.status === 'FAILED') {
+  if (emailRecord.status === 'SENT') {
     console.log(
       `[Worker] EmailJob ${emailJobId} already processed (status: ${emailRecord.status}). Skipping (Idempotency).`
     );
@@ -77,53 +78,33 @@ export async function processEmail(job: Job<EmailJobPayload>): Promise<void> {
     data: { status: 'SENDING' },
   });
 
-  let sendResult: SendMailResult;
   try {
-    sendResult = await smtpService.sendMail(
+    const sendResult = await smtpService.sendMail(
       recipientEmail,
       subject,
       body,
       senderEmail
     );
-  } catch (firstErr: any) {
-    console.log('[Worker] Retrying email delivery once due to socket reset / timeout...');
-    await sleep(1500);
-    try {
-      sendResult = await smtpService.sendMail(
-        recipientEmail,
-        subject,
-        body,
-        senderEmail
-      );
-    } catch (secondErr: any) {
-      sendResult = {
-        success: false,
-        error: secondErr.message || 'SMTP connection timeout',
-        messageId: `<${crypto.randomUUID()}@ethereal.email>`,
-        previewUrl: `https://ethereal.email/messages`,
-      };
-    }
-  }
 
-  if (sendResult && sendResult.success) {
     await prisma.emailJob.update({
       where: { id: emailJobId },
       data: {
         status: 'SENT',
         sentAt: new Date(),
         previewUrl: typeof sendResult.previewUrl === 'string' ? sendResult.previewUrl : null,
+        errorMessage: null,
       },
     });
     console.log(`[Worker] Successfully sent email ID ${emailJobId}`);
-  } else {
+  } catch (err: any) {
+    console.error(`[Worker] Error sending email ${emailJobId}:`, err);
     await prisma.emailJob.update({
       where: { id: emailJobId },
       data: {
         status: 'FAILED',
-        errorMessage: sendResult?.error || 'Unknown send error',
+        errorMessage: err?.message || 'Error delivering email',
       },
     });
-    console.error(`[Worker] Failed sending email ID ${emailJobId}: ${sendResult?.error}`);
   }
 
   const throttleSeconds =
