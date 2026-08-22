@@ -49,13 +49,3 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 📋 What is Left for Your Submission
-
-1. **Record the 5-Minute Demo Video**:
-   - Show Google Login / User Profile header.
-   - Compose campaign and upload a leads CSV.
-   - Show Scheduled tab.
-   - Demonstrate **Crash-Restart Persistence**: Kill backend (`Ctrl+C`), wait 10s, restart (`npm run dev`) and show jobs survive and execute correctly.
-   - Show Sent tab and click Ethereal preview link.
-2. **Push to Private GitHub Repository & Invite Collaborators** (`Mitrajit` and `Yadav036`).
-3. **Submit Form** at the Outbox ClickUp link.
